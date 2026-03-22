@@ -9,26 +9,18 @@ set -o nounset                  # make using undefined variables throw an error
 set -o errexit                  # exit immediately if any command returns non-0
 set -o pipefail                 # exit from pipe if any command within fails
 set -o errtrace                 # subshells should inherit error handlers/traps
-shopt -s dotglob                # make * globs also match .hidden files
-shopt -s inherit_errexit        # make subshells inherit errexit behavior
+shopt -s dotglob > /dev/null 2>&1 || true   # make * globs also match .hidden files (safe for set -e)
+shopt -s inherit_errexit > /dev/null 2>&1 || true  # make subshells inherit errexit behavior (safe for set -e)
 IFS=$'\n'                       # set array separator to newline to avoid word splitting bugs
-trap 'log_quit SIGINT' SIGINT
-trap 'log_quit SIGPIPE' SIGPIPE
-trap 'log_quit SIGQUIT' SIGQUIT
-trap 'log_quit SIGTSTP' SIGTSTP
-trap 'log_quit TIMEOUT' SIGALRM
-# trap 'log_quit SIGABRT' SIGABRT
-trap 'log_quit $? "${BASH_SOURCE//$PWD/.}:${LINENO} ${FUNCNAME:-}($(IFS=" "; echo "$*"))"' ERR
 
 SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
 ROOT_PID=$$
 PARENT_PID=$PPID
 
-# get input/output redirection state
-[[ ! -t 0 ]]; IS_STDIN_TTY="${?}"
-[[ ! -t 1 ]]; IS_STDOUT_TTY="${?}"
-[[ ! -t 2 ]]; IS_STDERR_TTY="${?}"
-[[ ! "$IS_STDIN_TTY$IS_STDOUT_TTY$IS_STDERR_TTY" == "111" ]]; IS_TTY="${?}"
+# get input/output redirection state (safe for set -e)
+[[ ! -t 0 ]] && IS_STDIN_TTY=1 || IS_STDIN_TTY=0
+[[ ! -t 1 ]] && IS_STDOUT_TTY=1 || IS_STDOUT_TTY=0
+[[ ! -t 2 ]] && IS_STDERR_TTY=1 || IS_STDERR_TTY=0
 
 ### General Helpers
 
@@ -243,14 +235,22 @@ function REQUIRES_CONFIG {
 }
 
 
-# function main {
-#     local METHOD="$1"; shift; local ARGS=("$@")
+# Install error handling traps (should be called after logging.sh is loaded)
+function install_traps {
+    # Only install traps if log_quit function is available
+    if [[ "$(type -t "log_quit")" == "function" ]]; then
+        trap 'log_quit SIGINT' SIGINT
+        trap 'log_quit SIGPIPE' SIGPIPE
+        trap 'log_quit SIGQUIT' SIGQUIT
+        trap 'log_quit SIGTSTP' SIGTSTP
+        trap 'log_quit TIMEOUT' SIGALRM
+        # trap 'log_quit SIGABRT' SIGABRT
+        trap 'log_quit $? "${BASH_SOURCE//$PWD/.}:${LINENO} ${FUNCNAME:-}($(IFS=" "; echo "$*"))"' ERR
+    fi
+}
 
-#     if [[ "$METHOD" != "import" ]]; then
-#         eval "$METHOD ${ARGS[*]}"
-#         return "$?"
-#     fi
-# }
-
-# main "$@"
+# Auto-install traps if logging.sh is already loaded (supports reverse loading order)
+if [[ "$(type -t "log_quit")" == "function" ]]; then
+    install_traps
+fi
 
