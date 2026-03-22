@@ -1,5 +1,26 @@
 #!/usr/bin/env bash
 # Basic utils and setup used by all the other scripts
+#
+# This file provides:
+#   - Bash strict mode setup (errexit, nounset, pipefail, etc.)
+#   - Helper functions for dependency checking (REQUIRES_CMDS, REQUIRES_FUNCS, etc.)
+#   - Utility functions (timed, repeated, try, backtrace, etc.)
+#
+# Dependencies: None (this file is self-contained)
+#
+# Usage:
+#   # Option 1: Load base.sh first, then logging.sh (traps auto-enabled)
+#   source util/base.sh
+#   source util/logging.sh
+#   # setup_traps() is called automatically
+#
+#   # Option 2: Load logging.sh first, then base.sh (traps auto-enabled)
+#   source util/logging.sh
+#   source util/base.sh
+#   # setup_traps() is called automatically
+#
+# Note: When both files are loaded, signal traps are automatically enabled.
+# The setup_traps() function is defined in logging.sh.
 
 ### Bash Environment Setup
 # http://redsymbol.net/articles/unofficial-bash-strict-mode/
@@ -10,25 +31,14 @@ set -o errexit                  # exit immediately if any command returns non-0
 set -o pipefail                 # exit from pipe if any command within fails
 set -o errtrace                 # subshells should inherit error handlers/traps
 shopt -s dotglob                # make * globs also match .hidden files
-shopt -s inherit_errexit        # make subshells inherit errexit behavior
+shopt -s inherit_errexit 2>/dev/null || true
 IFS=$'\n'                       # set array separator to newline to avoid word splitting bugs
-trap 'log_quit SIGINT' SIGINT
-trap 'log_quit SIGPIPE' SIGPIPE
-trap 'log_quit SIGQUIT' SIGQUIT
-trap 'log_quit SIGTSTP' SIGTSTP
-trap 'log_quit TIMEOUT' SIGALRM
-# trap 'log_quit SIGABRT' SIGABRT
-trap 'log_quit $? "${BASH_SOURCE//$PWD/.}:${LINENO} ${FUNCNAME:-}($(IFS=" "; echo "$*"))"' ERR
 
 SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
 ROOT_PID=$$
 PARENT_PID=$PPID
 
-# get input/output redirection state
-[[ ! -t 0 ]]; IS_STDIN_TTY="${?}"
-[[ ! -t 1 ]]; IS_STDOUT_TTY="${?}"
-[[ ! -t 2 ]]; IS_STDERR_TTY="${?}"
-[[ ! "$IS_STDIN_TTY$IS_STDOUT_TTY$IS_STDERR_TTY" == "111" ]]; IS_TTY="${?}"
+_IS_BASE_LOADED=1
 
 ### General Helpers
 
@@ -201,6 +211,10 @@ function IMPORT {
         fi
     done
 }
+
+if [[ "${_IS_LOGGING_LOADED:-0}" == "1" ]]; then
+    setup_traps
+fi
 
 function REQUIRES_FUNCS {
     for FUNC in "$@"; do

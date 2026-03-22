@@ -1,6 +1,31 @@
-#!/usr/bin/env/bash
+#!/usr/bin/env bash
+# Logging utilities for bash scripts
+#
+# This file provides:
+#   - Colored log output functions (debug, info, warn, error, fatal)
+#   - log_quit() for signal handling and clean exit
+#   - log_start() for logging script startup with config
+#   - setup_traps() for automatic signal handler setup
+#
+# Dependencies: None (self-contained, requires `sed` command)
+#
+# Usage:
+#   # Option 1: Load logging.sh alone (fully self-contained)
+#   source util/logging.sh
+#   setup_traps
+#
+#   # Option 2: Load with base.sh for additional utilities
+#   source util/base.sh
+#   source util/logging.sh
+#   setup_traps  # Automatically called if base.sh was loaded first
+#
+# Note: setup_traps() is called automatically when both files are loaded,
+# regardless of load order.
 
-REQUIRES_CMDS sed
+if ! command -v sed > /dev/null; then
+    echo "[X] Missing required command sed (is it installed on this system and available in \$PATH?)" >&2
+    exit 4
+fi
 
 
 ### Global Variables
@@ -10,6 +35,8 @@ RED='\033[0;31m'
 YELLOW='\033[0;33m'
 CYAN='\033[0;36m'
 GRAY='\033[2;37m'
+
+_IS_LOGGING_LOADED=1
 
 
 ### Logging Helpers
@@ -124,7 +151,11 @@ function fatal {
         esac
     done
 
-    log FATAL "$MSG\n$(backtrace $BACKTRACE_DEPTH)"
+    local BT_MSG=""
+    if [[ "$(type -t backtrace)" == "function" ]]; then
+        BT_MSG="\n$(backtrace $BACKTRACE_DEPTH)"
+    fi
+    log FATAL "$MSG$BT_MSG"
 
     # e.g. if STATUS is a named signal like SIGSEV instead of a number
     [ ! -z "${STATUS##*[!0-9]*}" ] || STATUS=3
@@ -134,4 +165,17 @@ function fatal {
 
     exit $STATUS
 }
+
+function setup_traps {
+    trap 'log_quit SIGINT' SIGINT
+    trap 'log_quit SIGPIPE' SIGPIPE
+    trap 'log_quit SIGQUIT' SIGQUIT
+    trap 'log_quit SIGTSTP' SIGTSTP
+    trap 'log_quit TIMEOUT' SIGALRM
+    trap 'log_quit $? "${BASH_SOURCE//$PWD/.}:${LINENO} ${FUNCNAME:-}($(IFS=" "; echo "$*"))"' ERR
+}
+
+if [[ "${_IS_BASE_LOADED:-0}" == "1" ]]; then
+    setup_traps
+fi
 
