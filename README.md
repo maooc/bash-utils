@@ -8,6 +8,63 @@ A collection of my hand-crafted bash scripts and helper functions for various co
 - `lib/` is a collection of adapters to interact with 3rd party tools or scripts, e.g. cloudflare/letsencrypt/etc
 - `util/` is a collection of pure bash functions to make development in bash easier e.g. logging/configuration/error handling/etc.
 
+## Core Utilities (util/)
+
+The `util/` directory contains foundational bash helper functions. Two key files are:
+
+### util/base.sh
+
+Provides bash strict mode setup and utility functions:
+- Bash strict mode (errexit, nounset, pipefail, etc.)
+- Dependency checking functions: `REQUIRES_CMDS`, `REQUIRES_FUNCS`, `REQUIRES_VARS`, `REQUIRES_CONFIG`
+- Utility functions: `timed`, `repeated`, `try`, `backtrace`, `trace_top_caller`
+
+**Dependencies:** None (self-contained)
+
+### util/logging.sh
+
+Provides logging and output functions:
+- Colored log output: `debug`, `info`, `warn`, `error`, `fatal`
+- `log_quit()` for clean exit on signals
+- `setup_traps()` for automatic signal handler setup
+
+**Dependencies:** None (self-contained, requires `sed` command)
+
+### Loading Order and Trap Behavior
+
+Both files are fully self-contained and can be loaded in **any order**. When both files are loaded, signal traps are **automatically enabled**:
+
+```bash
+#!/usr/bin/env bash
+
+# Option 1: base.sh first, then logging.sh
+source util/base.sh      # Sets up strict mode, defines backtrace, etc.
+source util/logging.sh   # Defines log functions, auto-calls setup_traps()
+
+# Option 2: logging.sh first, then base.sh
+source util/logging.sh   # Defines log functions
+source util/base.sh      # Auto-calls setup_traps()
+
+# Option 3: logging.sh alone (no traps, but all log functions work)
+source util/logging.sh
+setup_traps              # Manually enable traps if desired
+
+# Option 4: base.sh alone (no logging, strict mode only)
+source util/base.sh
+```
+
+**How it works:**
+- Each file sets a flag (`_IS_BASE_LOADED` or `_IS_LOGGING_LOADED`) when loaded
+- `logging.sh` checks if `base.sh` was already loaded and auto-calls `setup_traps()`
+- `base.sh` checks if `logging.sh` was already loaded and auto-calls `setup_traps()`
+- This ensures traps are always set when both files are loaded, regardless of order
+
+**Important Notes:**
+1. `setup_traps()` is defined in `logging.sh` (requires `log_quit()`)
+2. `fatal()` uses `backtrace()` if available (from `base.sh`), otherwise works without it
+3. Loading only `logging.sh` gives you all logging functions without strict mode
+4. Loading only `base.sh` gives you strict mode and utility functions without logging
+
 
 ## Reading List
 
