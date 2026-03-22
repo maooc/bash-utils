@@ -1,6 +1,10 @@
 #!/usr/bin/env/bash
 
-REQUIRES_CMDS sed
+# Check for required commands (inline check to avoid dependency on base.sh)
+if ! command -v sed > /dev/null; then
+    echo "[X] Missing required command sed (is it installed on this system and available in \$PATH?)" >&2
+    exit 4
+fi
 
 
 ### Global Variables
@@ -134,4 +138,9 @@ function fatal {
 
     exit $STATUS
 }
+
+# Install traps if install_traps function is available (from base.sh)
+if [[ "$(type -t "install_traps")" == "function" ]]; then
+    install_traps
+fi
 

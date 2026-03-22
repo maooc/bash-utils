@@ -8,6 +8,43 @@ A collection of my hand-crafted bash scripts and helper functions for various co
 - `lib/` is a collection of adapters to interact with 3rd party tools or scripts, e.g. cloudflare/letsencrypt/etc
 - `util/` is a collection of pure bash functions to make development in bash easier e.g. logging/configuration/error handling/etc.
 
+### Core Utility Files
+
+The `util/` directory contains two foundational files that work together:
+
+#### `util/base.sh`
+Provides core bash environment setup and helper functions:
+- Bash strict mode configuration (set -o errexit, nounset, pipefail, etc.)
+- Directory and PID variables (`SCRIPTS_DIR`, `ROOT_PID`, `PARENT_PID`)
+- TTY detection (`IS_STDIN_TTY`, `IS_STDOUT_TTY`, `IS_STDERR_TTY`)
+- Array manipulation helpers (`array_contents`, `merge_arrays`)
+- Execution utilities (`timed`, `repeated`, `try`)
+- Debugging and backtrace functions (`backtrace`, `trace_top_caller`)
+- Dependency checking (`IMPORT`, `REQUIRES_FUNCS`, `REQUIRES_CMDS`, `REQUIRES_VARS`, `REQUIRES_CONFIG`)
+- Trap installation function (`install_traps`)
+
+#### `util/logging.sh`
+Provides logging functionality with colored output:
+- Log level functions (`debug`, `info`, `warn`, `error`, `fatal`)
+- Signal and error handling (`log_quit`, `log_start`)
+- ANSI color codes for terminal output
+- Configurable timestamp and log level display
+
+#### Loading Order and Dependencies
+
+These two files have a specific loading order requirement. To ensure compatibility:
+
+**Recommended Order:**
+```bash
+source util/base.sh
+source util/logging.sh
+```
+
+**Loading in any order is now supported:**
+- If you load `base.sh` first: traps will be automatically installed when `logging.sh` is loaded
+- If you load `logging.sh` first: it will self-check dependencies (no external dependencies)
+- The `install_traps` function ensures traps are only installed when `log_quit` is available
+
 
 ## Reading List
 
