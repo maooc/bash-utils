@@ -1,4 +1,24 @@
-#!/usr/bin/env/bash
+#!/usr/bin/env bash
+#
+# 加载说明:
+#   - 此文件提供日志记录功能
+#   - 依赖 base.sh 中的 REQUIRES_CMDS 等函数
+#   - 如果 base.sh 尚未加载，logging.sh 会尝试自动加载它
+#
+# 预期加载顺序:
+#   1. source util/base.sh
+#   2. source util/logging.sh
+#   3. logging.sh 会自动调用 __base_setup_traps 设置 trap
+
+# 如果 base.sh 尚未加载，尝试自动加载
+if [[ "$(type -t REQUIRES_CMDS)" != "function" ]]; then
+    # 获取当前文件所在目录
+    __LOGGING_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+    if [[ -f "$__LOGGING_DIR/base.sh" ]]; then
+        source "$__LOGGING_DIR/base.sh"
+    fi
+    unset __LOGGING_DIR
+fi
 
 REQUIRES_CMDS sed
 
@@ -134,4 +154,10 @@ function fatal {
 
     exit $STATUS
 }
+
+# logging.sh 加载完成后，自动设置 base.sh 中的 trap
+# 这会确保 log_quit 函数已经可用
+if [[ "${__BASE_TRAPS_NEED_SETUP:-}" == "true" ]]; then
+    __base_setup_traps
+fi
 
