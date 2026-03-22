@@ -8,6 +8,49 @@ A collection of my hand-crafted bash scripts and helper functions for various co
 - `lib/` is a collection of adapters to interact with 3rd party tools or scripts, e.g. cloudflare/letsencrypt/etc
 - `util/` is a collection of pure bash functions to make development in bash easier e.g. logging/configuration/error handling/etc.
 
+## Utility Modules
+
+### base.sh
+
+基础工具库，提供通用函数和错误处理机制。
+
+**功能:**
+- 设置 bash 严格模式 (`set -euo pipefail`)
+- 提供 `REQUIRES_CMDS`, `REQUIRES_FUNCS`, `REQUIRES_VARS` 等依赖检查函数
+- 提供数组操作、超时控制、重试机制等工具函数
+- 提供 TTY 检测变量 (`IS_TTY`, `IS_STDIN_TTY`, `IS_STDOUT_TTY`, `IS_STDERR_TTY`)
+
+**加载方式:**
+```bash
+source util/base.sh
+```
+
+### logging.sh
+
+日志记录工具库，提供分级日志输出功能。
+
+**功能:**
+- 提供 `debug`, `info`, `warn`, `error`, `fatal` 等日志函数
+- 提供 `log_quit` 信号处理函数
+- 支持颜色输出和可配置的日志格式
+
+**依赖:**
+- 依赖 `base.sh` 中的 `REQUIRES_CMDS` 等函数
+
+**加载方式:**
+```bash
+# 方式1: 先加载 base.sh，再加载 logging.sh（推荐）
+source util/base.sh
+source util/logging.sh
+
+# 方式2: 直接加载 logging.sh（会自动加载 base.sh）
+source util/logging.sh
+```
+
+**注意事项:**
+- `base.sh` 中的 trap 设置会延迟到 `logging.sh` 加载完成后才执行，以确保 `log_quit` 函数可用
+- TTY 检测已修复，在 `set -e` 环境下不会触发错误退出
+
 
 ## Reading List
 

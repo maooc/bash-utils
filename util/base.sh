@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
 # Basic utils and setup used by all the other scripts
+#
+# 加载说明:
+#   - 此文件是基础工具库，提供通用函数和错误处理
+#   - 建议先加载 base.sh，再加载 logging.sh
+#   - 如果先加载 logging.sh，它会自动尝试加载 base.sh
+#
+# 依赖关系:
+#   - base.sh: 无依赖，可独立加载
+#   - logging.sh: 依赖 base.sh 中的 REQUIRES_CMDS 等函数
 
 ### Bash Environment Setup
 # http://redsymbol.net/articles/unofficial-bash-strict-mode/
@@ -9,26 +18,44 @@ set -o nounset                  # make using undefined variables throw an error
 set -o errexit                  # exit immediately if any command returns non-0
 set -o pipefail                 # exit from pipe if any command within fails
 set -o errtrace                 # subshells should inherit error handlers/traps
-shopt -s dotglob                # make * globs also match .hidden files
-shopt -s inherit_errexit        # make subshells inherit errexit behavior
+shopt -s dotglob 2>/dev/null || true   # make * globs also match .hidden files
+shopt -s inherit_errexit 2>/dev/null || true  # make subshells inherit errexit behavior (bash 4.4+)
 IFS=$'\n'                       # set array separator to newline to avoid word splitting bugs
-trap 'log_quit SIGINT' SIGINT
-trap 'log_quit SIGPIPE' SIGPIPE
-trap 'log_quit SIGQUIT' SIGQUIT
-trap 'log_quit SIGTSTP' SIGTSTP
-trap 'log_quit TIMEOUT' SIGALRM
-# trap 'log_quit SIGABRT' SIGABRT
-trap 'log_quit $? "${BASH_SOURCE//$PWD/.}:${LINENO} ${FUNCNAME:-}($(IFS=" "; echo "$*"))"' ERR
+
+# 延迟设置 trap，等待 logging.sh 加载完成后再设置
+# 这些 trap 会在 base.sh 被 source 后，通过 __base_setup_traps 函数设置
+__BASE_TRAPS_NEED_SETUP=true
+
+# 设置 trap 的函数，应在 logging.sh 加载完成后调用
+function __base_setup_traps {
+    if [[ "${__BASE_TRAPS_SETUP_DONE:-}" == "true" ]]; then
+        return 0
+    fi
+
+    # 检查 log_quit 函数是否可用
+    if [[ "$(type -t log_quit)" == "function" ]]; then
+        trap 'log_quit SIGINT' SIGINT
+        trap 'log_quit SIGPIPE' SIGPIPE
+        trap 'log_quit SIGQUIT' SIGQUIT
+        trap 'log_quit SIGTSTP' SIGTSTP
+        trap 'log_quit TIMEOUT' SIGALRM
+        # trap 'log_quit SIGABRT' SIGABRT
+        trap 'log_quit $? "${BASH_SOURCE//$PWD/.}:${LINENO} ${FUNCNAME:-}($(IFS=" "; echo "$*"))"' ERR
+        __BASE_TRAPS_SETUP_DONE=true
+        __BASE_TRAPS_NEED_SETUP=false
+    fi
+}
 
 SCRIPTS_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd .. && pwd )"
 ROOT_PID=$$
 PARENT_PID=$PPID
 
 # get input/output redirection state
-[[ ! -t 0 ]]; IS_STDIN_TTY="${?}"
-[[ ! -t 1 ]]; IS_STDOUT_TTY="${?}"
-[[ ! -t 2 ]]; IS_STDERR_TTY="${?}"
-[[ ! "$IS_STDIN_TTY$IS_STDOUT_TTY$IS_STDERR_TTY" == "111" ]]; IS_TTY="${?}"
+# 使用 || true 避免在 set -e 环境下触发错误退出
+IS_STDIN_TTY=1; [[ -t 0 ]] || IS_STDIN_TTY=0
+IS_STDOUT_TTY=1; [[ -t 1 ]] || IS_STDOUT_TTY=0
+IS_STDERR_TTY=1; [[ -t 2 ]] || IS_STDERR_TTY=0
+IS_TTY=0; [[ "$IS_STDIN_TTY$IS_STDOUT_TTY$IS_STDERR_TTY" == "111" ]] && IS_TTY=1
 
 ### General Helpers
 
